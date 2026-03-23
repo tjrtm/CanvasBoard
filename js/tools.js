@@ -110,6 +110,12 @@ export class ToolManager {
       case 'line':
         canvas.selection = false;
         canvas.defaultCursor = 'crosshair';
+        // Disable all object interaction so clicks go to line drawing, not shape dragging
+        canvas.forEachObject(o => {
+          if (o.data && (o.data._port || o.data._handle)) return;
+          o.selectable = false;
+          o.evented = false;
+        });
         document.body.classList.add('tool-crosshair');
         break;
 
