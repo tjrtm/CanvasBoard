@@ -498,26 +498,26 @@ export class ToolManager {
       conn.connect(
         { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
         { obj: finalSnap.obj, port: finalSnap.port },
-        { arrow: true }
+        { arrow: 'end' }
       );
     } else if (hasSource && !hasTarget) {
       // Source attached, target free
       conn.connect(
         { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
         { x, y },
-        { arrow: true }
+        { arrow: 'end' }
       );
     } else if (!hasSource && hasTarget) {
       // Source free, target attached
       conn.connect(
         { x: this._lineStart.x, y: this._lineStart.y },
         { obj: finalSnap.obj, port: finalSnap.port },
-        { arrow: true }
+        { arrow: 'end' }
       );
     } else {
       // Both free — standalone line
       const line = conn.createLine(
-        this._lineStart.x, this._lineStart.y, x, y, { arrow: true }
+        this._lineStart.x, this._lineStart.y, x, y, { arrow: 'end' }
       );
       this.canvas.add(line);
       this.canvas.setActiveObject(line);
