@@ -98,9 +98,20 @@ export class ConnectorManager {
       return obj.getCenterPoint();
     }
     const center = obj.getCenterPoint();
-    const b = obj.getBoundingRect(false, true);
     const def = PORT_DEFS[portName];
-    return { x: center.x + def.nx * b.width, y: center.y + def.ny * b.height };
+
+    // For groups, use the group's own width/height * scaleX/Y for accurate borders
+    let w, h;
+    if (obj.width !== undefined && obj.height !== undefined) {
+      w = obj.width * (obj.scaleX || 1);
+      h = obj.height * (obj.scaleY || 1);
+    } else {
+      const b = obj.getBoundingRect(false, true);
+      w = b.width;
+      h = b.height;
+    }
+
+    return { x: center.x + def.nx * w, y: center.y + def.ny * h };
   }
 
   /**
