@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CanvasBoard — Infinite Canvas</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Fabric.js v5 (local, patched textBaseline bug) -->
+  <script src="lib/fabric.min.js"></script>
+</head>
+<body class="dark-theme">
+
+  <!-- TOP BAR -->
+  <header id="top-bar">
+    <div id="top-left">
+      <button id="menu-btn" class="icon-btn" title="Menu">
+        <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span id="app-title">CanvasBoard</span>
+    </div>
+
+    <!-- Alignment tools shown when multiple objects selected -->
+    <div id="align-tools" class="hidden">
+      <button class="icon-btn align-btn" data-align="left" title="Align Left">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="10" height="4" rx="1"/><rect x="3" y="11" width="16" height="4" rx="1"/><rect x="3" y="17" width="7" height="4" rx="1"/><line x1="3" y1="2" x2="3" y2="22"/></svg>
+      </button>
+      <button class="icon-btn align-btn" data-align="centerH" title="Center Horizontally">
+        <svg viewBox="0 0 24 24"><rect x="7" y="5" width="10" height="4" rx="1"/><rect x="4" y="11" width="16" height="4" rx="1"/><rect x="8" y="17" width="8" height="4" rx="1"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+      </button>
+      <button class="icon-btn align-btn" data-align="right" title="Align Right">
+        <svg viewBox="0 0 24 24"><rect x="11" y="5" width="10" height="4" rx="1"/><rect x="5" y="11" width="16" height="4" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/><line x1="21" y1="2" x2="21" y2="22"/></svg>
+      </button>
+      <div class="sep-v"></div>
+      <button class="icon-btn align-btn" data-align="top" title="Align Top">
+        <svg viewBox="0 0 24 24"><rect x="5" y="7" width="4" height="10" rx="1"/><rect x="11" y="7" width="4" height="16" rx="1"/><rect x="17" y="7" width="4" height="7" rx="1"/><line x1="2" y1="3" x2="22" y2="3"/></svg>
+      </button>
+      <button class="icon-btn align-btn" data-align="centerV" title="Center Vertically">
+        <svg viewBox="0 0 24 24"><rect x="5" y="5" width="4" height="10" rx="1"/><rect x="11" y="3" width="4" height="16" rx="1"/><rect x="17" y="7" width="4" height="7" rx="1"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+      </button>
+      <button class="icon-btn align-btn" data-align="bottom" title="Align Bottom">
+        <svg viewBox="0 0 24 24"><rect x="5" y="7" width="4" height="10" rx="1"/><rect x="11" y="1" width="4" height="16" rx="1"/><rect x="17" y="10" width="4" height="7" rx="1"/><line x1="2" y1="21" x2="22" y2="21"/></svg>
+      </button>
+      <div class="sep-v"></div>
+      <button class="icon-btn align-btn" data-align="distributeH" title="Distribute Horizontally">
+        <svg viewBox="0 0 24 24"><rect x="2" y="8" width="4" height="8" rx="1"/><rect x="10" y="6" width="4" height="12" rx="1"/><rect x="18" y="8" width="4" height="8" rx="1"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+      </button>
+      <button class="icon-btn align-btn" data-align="distributeV" title="Distribute Vertically">
+        <svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><rect x="6" y="10" width="12" height="4" rx="1"/><rect x="8" y="18" width="8" height="4" rx="1"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+      </button>
+    </div>
+
+    <div id="top-right">
+      <button id="save-btn" class="top-btn" title="Save board as JSON">Save</button>
+      <button id="load-btn" class="top-btn" title="Load board from JSON">Load</button>
+      <input type="file" id="load-file-input" accept=".json,.canvasboard.json" style="display:none">
+      <div class="dropdown-wrap">
+        <button id="export-btn" class="top-btn" title="Export">Export ▾</button>
+        <div id="export-menu" class="dropdown-menu hidden">
+          <button data-export="png">Export PNG</button>
+          <button data-export="svg">Export SVG</button>
+        </div>
+      </div>
+      <button id="theme-btn" class="icon-btn" title="Toggle theme">
+        <svg viewBox="0 0 24 24" id="theme-icon"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <div id="main-layout">
+
+    <!-- LEFT TOOLBAR -->
+    <aside id="toolbar">
+      <button class="tool-btn active" data-tool="select" title="Select (V)">
+        <svg viewBox="0 0 24 24"><path d="M4 4l7 18 3-7 7-3z"/></svg>
+      </button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" data-tool="sticky" title="Sticky Note (S)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="rect" title="Rectangle (R)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="circle" title="Circle (C)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="diamond" title="Diamond (D)">
+        <svg viewBox="0 0 24 24"><polygon points="12,2 22,12 12,22 2,12"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="triangle" title="Triangle">
+        <svg viewBox="0 0 24 24"><polygon points="12,3 22,21 2,21"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="text" title="Text (T)">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M12 6v13M9 19h6"/></svg>
+      </button>
+      <div class="tool-sep"></div>
+      <button class="tool-btn" data-tool="pen" title="Pen (P)">
+        <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="line" title="Line/Arrow (L)">
+        <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="15,5 19,5 19,9"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="eraser" title="Eraser (E)">
+        <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16l13-13 7 7-3 10z"/><line x1="6" y1="14" x2="14" y2="6"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="frame" title="Frame (F)">
+        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2" fill="none"/><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+      </button>
+    </aside>
+
+    <!-- CANVAS AREA -->
+    <div id="canvas-area">
+      <canvas id="grid-canvas"></canvas>
+      <canvas id="main-canvas"></canvas>
+
+      <!-- MINI-MAP -->
+      <div id="minimap-container">
+        <canvas id="minimap-canvas" width="200" height="140"></canvas>
+      </div>
+
+      <!-- ZOOM CONTROLS -->
+      <div id="zoom-controls">
+        <button id="zoom-out-btn" class="zoom-btn" title="Zoom Out">−</button>
+        <button id="zoom-display" class="zoom-display" title="Reset zoom (Ctrl+0)">100%</button>
+        <button id="zoom-in-btn" class="zoom-btn" title="Zoom In">+</button>
+        <button id="zoom-fit-btn" class="zoom-btn zoom-fit" title="Fit to content">⊡</button>
+      </div>
+    </div>
+
+    <!-- RIGHT PROPERTIES PANEL -->
+    <aside id="properties-panel">
+      <div id="props-placeholder">
+        <svg viewBox="0 0 24 24" style="width:32px;height:32px;opacity:0.3"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+        <p>Select an object to edit its properties</p>
+      </div>
+
+      <div id="props-content" class="hidden">
+
+        <!-- Transform -->
+        <div class="props-section">
+          <div class="props-title">Transform</div>
+          <div class="props-row">
+            <label>X</label><input type="number" id="prop-x" class="prop-input">
+            <label>Y</label><input type="number" id="prop-y" class="prop-input">
+          </div>
+          <div class="props-row">
+            <label>W</label><input type="number" id="prop-w" class="prop-input" min="1">
+            <label>H</label><input type="number" id="prop-h" class="prop-input" min="1">
+          </div>
+          <div class="props-row">
+            <label>Rotate</label>
+            <input type="number" id="prop-angle" class="prop-input" step="1">°
+          </div>
+          <div class="props-row">
+            <label>Opacity</label>
+            <input type="range" id="prop-opacity" min="0" max="100" value="100" class="prop-slider">
+            <span id="prop-opacity-val">100%</span>
+          </div>
+        </div>
+
+        <!-- Fill & Stroke -->
+        <div class="props-section" id="style-props">
+          <div class="props-title">Style</div>
+          <div class="props-row">
+            <label>Fill</label>
+            <input type="color" id="prop-fill" class="prop-color" value="#4a90e2">
+            <button id="prop-fill-none" class="prop-mini-btn" title="No fill">∅</button>
+          </div>
+          <div class="color-presets" id="fill-presets"></div>
+          <div class="props-row">
+            <label>Stroke</label>
+            <input type="color" id="prop-stroke" class="prop-color" value="#2c5282">
+            <button id="prop-stroke-none" class="prop-mini-btn" title="No stroke">∅</button>
+          </div>
+          <div class="props-row">
+            <label>Stroke W</label>
+            <input type="range" id="prop-stroke-width" min="0" max="20" value="1" class="prop-slider">
+            <span id="prop-stroke-width-val">1</span>
+          </div>
+          <div class="props-row" id="border-radius-row">
+            <label>Radius</label>
+            <input type="range" id="prop-radius" min="0" max="50" value="0" class="prop-slider">
+            <span id="prop-radius-val">0</span>
+          </div>
+        </div>
+
+        <!-- Text Properties -->
+        <div class="props-section hidden" id="text-props">
+          <div class="props-title">Text</div>
+          <div class="props-row">
+            <label>Color</label>
+            <input type="color" id="prop-text-color" class="prop-color" value="#ffffff">
+          </div>
+          <div class="props-row">
+            <label>Size</label>
+            <select id="prop-font-size" class="prop-select">
+              <option>10</option><option>12</option><option>14</option><option>16</option>
+              <option selected>18</option><option>20</option><option>24</option><option>28</option>
+              <option>32</option><option>36</option><option>48</option><option>64</option><option>72</option>
+            </select>
+          </div>
+          <div class="props-row">
+            <label>Weight</label>
+            <button id="prop-bold" class="prop-toggle-btn" data-active="false">B</button>
+            <button id="prop-italic" class="prop-toggle-btn" data-active="false"><i>I</i></button>
+          </div>
+          <div class="props-row">
+            <label>Align</label>
+            <div class="btn-group">
+              <button class="prop-mini-btn text-align-btn" data-align="left" title="Left">⬛⬜⬜</button>
+              <button class="prop-mini-btn text-align-btn" data-align="center" title="Center">⬜⬛⬜</button>
+              <button class="prop-mini-btn text-align-btn" data-align="right" title="Right">⬜⬜⬛</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Note Color -->
+        <div class="props-section hidden" id="sticky-props">
+          <div class="props-title">Note Color</div>
+          <div class="color-presets" id="sticky-color-presets"></div>
+        </div>
+
+        <!-- Shape Text Properties (for rect, circle, diamond, triangle, sticky groups) -->
+        <div class="props-section hidden" id="shape-text-props">
+          <div class="props-title">Shape Text</div>
+          <div class="props-row">
+            <label>Color</label>
+            <input type="color" id="prop-shape-text-color" class="prop-color" value="#ffffff">
+          </div>
+        </div>
+
+        <!-- Line Properties -->
+        <div class="props-section hidden" id="line-props">
+          <div class="props-title">Line</div>
+          <div class="props-row">
+            <label>Style</label>
+            <select id="prop-line-style" class="prop-select">
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
+          </div>
+          <div class="props-row">
+            <label>Arrow</label>
+            <input type="checkbox" id="prop-arrow-end">
+          </div>
+        </div>
+
+        <!-- Z-Order / Actions -->
+        <div class="props-section">
+          <div class="props-title">Arrange</div>
+          <div class="props-row btn-grid">
+            <button class="prop-action-btn" id="btn-to-front">To Front</button>
+            <button class="prop-action-btn" id="btn-to-back">To Back</button>
+            <button class="prop-action-btn" id="btn-fwd">Forward</button>
+            <button class="prop-action-btn" id="btn-bwd">Backward</button>
+          </div>
+          <div class="props-row btn-grid">
+            <button class="prop-action-btn" id="btn-group">Group</button>
+            <button class="prop-action-btn" id="btn-ungroup">Ungroup</button>
+            <button class="prop-action-btn danger" id="btn-delete">Delete</button>
+            <button class="prop-action-btn" id="btn-duplicate">Duplicate</button>
+          </div>
+        </div>
+
+      </div><!-- /props-content -->
+    </aside>
+
+  </div><!-- /main-layout -->
+
+  <!-- Context Menu -->
+  <div id="context-menu" class="hidden">
+    <button data-action="bring-front">Bring to Front</button>
+    <button data-action="send-back">Send to Back</button>
+    <button data-action="bring-forward">Bring Forward</button>
+    <button data-action="send-backward">Send Backward</button>
+    <div class="ctx-sep"></div>
+    <button data-action="group">Group</button>
+    <button data-action="ungroup">Ungroup</button>
+    <div class="ctx-sep"></div>
+    <button data-action="duplicate">Duplicate</button>
+    <button data-action="copy">Copy</button>
+    <button data-action="paste">Paste</button>
+    <div class="ctx-sep"></div>
+    <button data-action="delete" class="danger">Delete</button>
+  </div>
+
+  <!-- JS Modules -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
