@@ -107,6 +107,7 @@ export class UIManager {
       case 'duplicate':     sel.duplicate(); break;
       case 'copy':          sel.copy(); break;
       case 'paste':         sel.paste(); break;
+      case 'lock':          sel.toggleLock(); break;
       case 'delete':        sel.deleteSelected(); break;
     }
   }

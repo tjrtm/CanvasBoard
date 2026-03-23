@@ -135,11 +135,19 @@ export class SelectionManager {
     if (selected.length < 2) return;
 
     this.canvas.discardActiveObject();
+
+    // Suppress connector removal during grouping
+    if (this.app.connectors) this.app.connectors._rebuilding = true;
+
     const group = new fabric.Group(selected, {
       data: { type: 'group' },
+      subTargetCheck: true,
     });
 
     selected.forEach(obj => this.canvas.remove(obj));
+
+    if (this.app.connectors) this.app.connectors._rebuilding = false;
+
     this.canvas.add(group);
     this.canvas.setActiveObject(group);
     this.canvas.renderAll();
@@ -154,28 +162,78 @@ export class SelectionManager {
     if (active.data && ['rect', 'circle', 'diamond', 'triangle', 'sticky'].includes(active.data.type)) return;
 
     const items = active.getObjects();
-    this.canvas.remove(active);
 
-    const matrix = active.calcTransformMatrix();
+    // Suppress connector removal during ungrouping
+    if (this.app.connectors) this.app.connectors._rebuilding = true;
+    this.canvas.remove(active);
+    if (this.app.connectors) this.app.connectors._rebuilding = false;
+
+    // Use fabric's built-in destroy to properly restore child positions
+    const groupLeft = active.left;
+    const groupTop = active.top;
+    const groupScaleX = active.scaleX || 1;
+    const groupScaleY = active.scaleY || 1;
+    const groupAngle = active.angle || 0;
+    const groupCenter = active.getCenterPoint();
+
     items.forEach(obj => {
-      const newTransform = fabric.util.multiplyTransformMatrices(
-        matrix, obj.calcTransformMatrix()
+      // Get the object's absolute position using the group transform
+      const absPos = fabric.util.transformPoint(
+        { x: obj.left || 0, y: obj.top || 0 },
+        active.calcTransformMatrix()
       );
-      const decomposed = fabric.util.qrDecompose(newTransform);
       obj.set({
-        scaleX: decomposed.scaleX,
-        scaleY: decomposed.scaleY,
-        angle: decomposed.angle,
-        left: decomposed.translateX,
-        top: decomposed.translateY,
-        originX: 'left',
-        originY: 'top',
+        left: absPos.x,
+        top: absPos.y,
+        scaleX: (obj.scaleX || 1) * groupScaleX,
+        scaleY: (obj.scaleY || 1) * groupScaleY,
+        angle: (obj.angle || 0) + groupAngle,
       });
+      obj.setCoords();
       this.canvas.add(obj);
     });
 
     const selection = new fabric.ActiveSelection(items, { canvas: this.canvas });
     this.canvas.setActiveObject(selection);
+    this.canvas.renderAll();
+    this.app.history.saveState();
+  }
+
+  // ─── Lock / Unlock ──────────────────────────────────────────────────────────
+
+  toggleLock() {
+    const objects = this.canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // If any are unlocked, lock all. If all locked, unlock all.
+    const anyUnlocked = objects.some(o => !o.locked);
+
+    objects.forEach(obj => {
+      const lock = anyUnlocked;
+      obj.set({
+        locked: lock,
+        lockMovementX: lock,
+        lockMovementY: lock,
+        lockRotation: lock,
+        lockScalingX: lock,
+        lockScalingY: lock,
+        hasControls: !lock,
+        selectable: true, // still selectable so user can unlock
+        evented: true,
+      });
+      // Visual cue: reduce opacity slightly when locked
+      if (lock) {
+        obj._preLockOpacity = obj.opacity;
+        obj.set('opacity', Math.max(0.5, (obj.opacity || 1) * 0.7));
+      } else {
+        if (obj._preLockOpacity !== undefined) {
+          obj.set('opacity', obj._preLockOpacity);
+          delete obj._preLockOpacity;
+        }
+      }
+    });
+
+    this.canvas.discardActiveObject();
     this.canvas.renderAll();
     this.app.history.saveState();
   }
