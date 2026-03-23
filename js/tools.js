@@ -41,7 +41,7 @@ export class ToolManager {
 
     // Clean up port indicators when leaving line tool
     if (name === 'line' && this.app.connectors) {
-      this.app.connectors.hidePorts();
+      this.app.connectors._clearPortDots();
       this._lineSourceSnap = null;
       this._lineTargetSnap = null;
     }
@@ -387,124 +387,116 @@ export class ToolManager {
   // ─── Line / Arrow (connection-aware) ───────────────────────────────────────
 
   _handleLineHover(x, y) {
-    // When line tool is active but not drawing, show port indicators
-    if (this._lineStart) return; // already drawing, handled by _updateTempLine
+    if (this._lineStart) return;
+    const conn = this.app.connectors;
 
-    const connectors = this.app.connectors;
-    const nearest = connectors.findNearestPort(x, y, null);
-
-    if (nearest) {
-      connectors.showPorts(nearest.obj);
+    // Find object under cursor
+    const target = this.canvas.findTarget({ clientX: 0, clientY: 0 }, false);
+    // Use port detection instead
+    const snap = conn.findSnapPort(x, y, null);
+    if (snap) {
+      conn.showPortsOn(snap.obj);
     } else {
-      connectors.hidePorts();
+      conn._clearPortDots();
     }
   }
 
   _startLine(x, y) {
-    const connectors = this.app.connectors;
-
-    // Check if we're starting near a port
-    const snap = connectors.findNearestPort(x, y, null);
+    const conn = this.app.connectors;
+    const snap = conn.findSnapPort(x, y, null);
 
     if (snap) {
-      // Snap to port
-      this._lineSourceSnap = { obj: snap.obj, port: snap.portName };
+      this._lineSourceSnap = { obj: snap.obj, port: snap.port };
       this._lineStart = { x: snap.pos.x, y: snap.pos.y };
-      connectors.highlightPort(snap.obj, snap.portName);
+      conn.highlightPort(snap.obj, snap.port);
     } else {
       this._lineSourceSnap = null;
       this._lineStart = { x, y };
     }
 
-    // Create temp preview line
-    const sx = this._lineStart.x;
-    const sy = this._lineStart.y;
-    this._lineTempObj = new fabric.Line([sx, sy, sx, sy], {
-      stroke: this.app.canvasManager.isDark ? '#e0e0e0' : '#333',
-      strokeWidth: 2,
-      selectable: false,
-      evented: false,
-      data: { temp: true },
-    });
+    this._lineTempObj = new fabric.Line(
+      [this._lineStart.x, this._lineStart.y, this._lineStart.x, this._lineStart.y],
+      {
+        stroke: this.app.canvasManager.isDark ? '#b0b8c8' : '#555',
+        strokeWidth: 2,
+        strokeDashArray: [6, 4],
+        selectable: false, evented: false,
+        data: { temp: true },
+      }
+    );
     this.canvas.add(this._lineTempObj);
   }
 
   _updateTempLine(x, y) {
     if (!this._lineTempObj) return;
-
-    const connectors = this.app.connectors;
+    const conn = this.app.connectors;
     const sourceObj = this._lineSourceSnap ? this._lineSourceSnap.obj : null;
-
-    // Check for target port snap
-    const snap = connectors.findNearestPort(x, y, sourceObj);
+    const snap = conn.findSnapPort(x, y, sourceObj);
 
     if (snap) {
       this._lineTempObj.set({ x2: snap.pos.x, y2: snap.pos.y });
-      connectors.highlightPort(snap.obj, snap.portName);
-      this._lineTargetSnap = { obj: snap.obj, port: snap.portName };
+      conn.highlightPort(snap.obj, snap.port);
+      this._lineTargetSnap = snap;
     } else {
       this._lineTempObj.set({ x2: x, y2: y });
-      connectors.hidePorts();
-      // Re-show source port if we have one
+      conn._clearPortDots();
       if (this._lineSourceSnap) {
-        connectors.highlightPort(this._lineSourceSnap.obj, this._lineSourceSnap.port);
+        conn.highlightPort(this._lineSourceSnap.obj, this._lineSourceSnap.port);
       }
       this._lineTargetSnap = null;
     }
-
     this.canvas.renderAll();
   }
 
   _finishLine(x, y) {
     if (!this._lineStart) return;
+    const conn = this.app.connectors;
 
-    const connectors = this.app.connectors;
-
-    // Clean up temp objects
     if (this._lineTempObj) {
       this.canvas.remove(this._lineTempObj);
       this._lineTempObj = null;
     }
-    connectors.hidePorts();
+    conn._clearPortDots();
 
-    // Check final target snap
     const sourceObj = this._lineSourceSnap ? this._lineSourceSnap.obj : null;
-    const finalSnap = connectors.findNearestPort(x, y, sourceObj);
-    const targetSnap = finalSnap || this._lineTargetSnap;
+    const finalSnap = conn.findSnapPort(x, y, sourceObj) || this._lineTargetSnap;
 
-    // If both source and target are snapped to ports → create connection
-    if (this._lineSourceSnap && targetSnap) {
-      const sObj = this._lineSourceSnap.obj;
-      const sPort = this._lineSourceSnap.port;
-      const tObj = targetSnap.obj;
-      const tPort = targetSnap.port;
+    const hasSource = !!this._lineSourceSnap;
+    const hasTarget = !!finalSnap;
 
-      // Don't connect object to itself on the same port
-      if (sObj !== tObj || sPort !== tPort) {
-        connectors.connect(sObj, sPort, tObj, tPort, { arrow: true });
-        this.app.history.saveState();
-        this._lineStart = null;
-        this._lineSourceSnap = null;
-        this._lineTargetSnap = null;
-        this.setTool('select');
-        return;
-      }
+    if (hasSource && hasTarget && this._lineSourceSnap.obj !== finalSnap.obj) {
+      // Connected line
+      conn.connect(
+        { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
+        { obj: finalSnap.obj, port: finalSnap.port },
+        { arrow: true }
+      );
+    } else if (hasSource && !hasTarget) {
+      // Source attached, target free
+      conn.connect(
+        { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
+        { x, y },
+        { arrow: true }
+      );
+    } else if (!hasSource && hasTarget) {
+      // Source free, target attached
+      conn.connect(
+        { x: this._lineStart.x, y: this._lineStart.y },
+        { obj: finalSnap.obj, port: finalSnap.port },
+        { arrow: true }
+      );
+    } else {
+      // Both free — standalone line
+      const line = conn.createLine(
+        this._lineStart.x, this._lineStart.y, x, y, { arrow: true }
+      );
+      this.canvas.add(line);
+      this.canvas.setActiveObject(line);
     }
-
-    // Otherwise create a standalone line
-    const endX = targetSnap ? connectors.getPortPosition(targetSnap.obj, targetSnap.port).x : x;
-    const endY = targetSnap ? connectors.getPortPosition(targetSnap.obj, targetSnap.port).y : y;
-
-    const line = connectors.createLine(
-      this._lineStart.x, this._lineStart.y, endX, endY, { arrow: true }
-    );
 
     this._lineStart = null;
     this._lineSourceSnap = null;
     this._lineTargetSnap = null;
-
-    this.canvas.add(line);
-    this.canvas.setActiveObject(line);
     this.canvas.renderAll();
     this.app.history.saveState();
     this.setTool('select');

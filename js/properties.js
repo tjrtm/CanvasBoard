@@ -191,6 +191,18 @@ export class PropertiesPanel {
       const obj = this.canvas.getActiveObject();
       if (obj) this.app.connectors.toggleArrow(obj);
     });
+    on('prop-route-mode', 'change', () => {
+      const obj = this.canvas.getActiveObject();
+      if (obj && obj.data && obj.data.connId) {
+        const rec = this.app.connectors.connections.get(obj.data.connId);
+        if (rec) {
+          rec.mode = document.getElementById('prop-route-mode').value;
+          this.app.connectors._rebuildLine(rec);
+          this.canvas.renderAll();
+          this.app.history.saveState();
+        }
+      }
+    });
   }
 
   // ─── Action buttons (arrange etc.) ─────────────────────────────────────────
@@ -413,6 +425,17 @@ export class PropertiesPanel {
       if (lsEl) lsEl.value = (obj.data && obj.data.style) || 'solid';
       const arrowEl = document.getElementById('prop-arrow-end');
       if (arrowEl) arrowEl.checked = !!(obj.data && obj.data.arrow);
+
+      // Show routing mode only for connections
+      const routeRow = document.getElementById('routing-mode-row');
+      const routeEl = document.getElementById('prop-route-mode');
+      if (obj.data && obj.data.connId && routeRow) {
+        routeRow.classList.remove('hidden');
+        const rec = this.app.connectors.connections.get(obj.data.connId);
+        if (rec && routeEl) routeEl.value = rec.mode || 'straight';
+      } else if (routeRow) {
+        routeRow.classList.add('hidden');
+      }
     }
   }
 
