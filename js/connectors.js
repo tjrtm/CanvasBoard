@@ -52,6 +52,7 @@ export class ConnectorManager {
     this._activeConn = null;   // currently selected connection
     this._draggingEnd = null;  // 'source' | 'target' while dragging handle
     this._dragTempLine = null;
+    this._rebuilding = false;  // guard: true during line rebuild to suppress removal handler
   }
 
   init() {
@@ -391,12 +392,14 @@ export class ConnectorManager {
   }
 
   _rebuildLine(rec) {
+    this._rebuilding = true;
     if (rec.line) this.canvas.remove(rec.line);
     rec.line = this._buildLine(rec);
     if (rec.line) {
       this.canvas.add(rec.line);
       this.canvas.sendToBack(rec.line);
     }
+    this._rebuilding = false;
   }
 
   // ─── Selection & endpoint handles ──────────────────────────────────────────
@@ -518,6 +521,7 @@ export class ConnectorManager {
 
   _onObjectRemoved(obj) {
     if (!obj.data) return;
+    if (this._rebuilding) return; // skip during line rebuild
 
     // Connection line removed → delete the record
     if (obj.data.type === 'connection' && obj.data.connId) {
