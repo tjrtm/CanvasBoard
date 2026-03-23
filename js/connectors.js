@@ -22,7 +22,7 @@
 
 const PORT_RADIUS = 5;
 const PORT_HOVER_RADIUS = 7;
-const SNAP_DISTANCE = 25;
+const SNAP_DISTANCE = 40;
 const HANDLE_RADIUS = 6;
 const ARROW_HEAD_LEN = 12;
 const ARROW_ANGLE = Math.PI / 6;
@@ -300,6 +300,7 @@ export class ConnectorManager {
    * Either end can be { obj, port } (attached) or { x, y } (free point).
    */
   connect(source, target, options = {}) {
+    console.log('[CONN] connect', source, target, options);
     const connId = uid();
     const isDark = this.app.canvasManager.isDark;
     const mode = options.mode || 'straight';

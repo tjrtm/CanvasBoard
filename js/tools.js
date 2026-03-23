@@ -396,20 +396,41 @@ export class ToolManager {
     if (this._lineStart) return;
     const conn = this.app.connectors;
 
-    // Find object under cursor
-    const target = this.canvas.findTarget({ clientX: 0, clientY: 0 }, false);
-    // Use port detection instead
+    // Show ports when cursor is near any connectable object
     const snap = conn.findSnapPort(x, y, null);
     if (snap) {
       conn.showPortsOn(snap.obj);
+      return;
+    }
+
+    // Also show ports if cursor is inside a connectable object's bounding box
+    const hoveredObj = this._findConnectableAt(x, y);
+    if (hoveredObj) {
+      conn.showPortsOn(hoveredObj);
     } else {
       conn._clearPortDots();
     }
   }
 
+  _findConnectableAt(x, y) {
+    const conn = this.app.connectors;
+    const objects = this.canvas.getObjects();
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i];
+      if (!conn._isConnectable(obj)) continue;
+      const b = obj.getBoundingRect(true, true);
+      if (x >= b.left && x <= b.left + b.width && y >= b.top && y <= b.top + b.height) {
+        return obj;
+      }
+    }
+    return null;
+  }
+
   _startLine(x, y) {
     const conn = this.app.connectors;
     const snap = conn.findSnapPort(x, y, null);
+
+    console.log('[LINE] startLine at', x, y, 'snap:', snap ? snap.port + ' on ' + (snap.obj.data && snap.obj.data.type) : 'none');
 
     if (snap) {
       this._lineSourceSnap = { obj: snap.obj, port: snap.port };
@@ -469,6 +490,8 @@ export class ToolManager {
 
     const hasSource = !!this._lineSourceSnap;
     const hasTarget = !!finalSnap;
+
+    console.log('[LINE] finishLine', { hasSource, hasTarget, finalSnap });
 
     if (hasSource && hasTarget && this._lineSourceSnap.obj !== finalSnap.obj) {
       // Connected line
