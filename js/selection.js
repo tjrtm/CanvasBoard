@@ -135,11 +135,19 @@ export class SelectionManager {
     if (selected.length < 2) return;
 
     this.canvas.discardActiveObject();
+
+    // Suppress connector removal during grouping
+    if (this.app.connectors) this.app.connectors._rebuilding = true;
+
     const group = new fabric.Group(selected, {
       data: { type: 'group' },
+      subTargetCheck: true,
     });
 
     selected.forEach(obj => this.canvas.remove(obj));
+
+    if (this.app.connectors) this.app.connectors._rebuilding = false;
+
     this.canvas.add(group);
     this.canvas.setActiveObject(group);
     this.canvas.renderAll();
@@ -154,7 +162,11 @@ export class SelectionManager {
     if (active.data && ['rect', 'circle', 'diamond', 'triangle', 'sticky'].includes(active.data.type)) return;
 
     const items = active.getObjects();
+
+    // Suppress connector removal during ungrouping
+    if (this.app.connectors) this.app.connectors._rebuilding = true;
     this.canvas.remove(active);
+    if (this.app.connectors) this.app.connectors._rebuilding = false;
 
     const matrix = active.calcTransformMatrix();
     items.forEach(obj => {
