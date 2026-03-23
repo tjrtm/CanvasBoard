@@ -39,6 +39,13 @@ export class ToolManager {
       canvas.isDrawingMode = false;
     }
 
+    // Clean up port indicators when leaving line tool
+    if (name === 'line' && this.app.connectors) {
+      this.app.connectors._clearPortDots();
+      this._lineSourceSnap = null;
+      this._lineTargetSnap = null;
+    }
+
     // Remove temp drawing object
     if (this._drawRect) {
       canvas.remove(this._drawRect);
@@ -103,6 +110,12 @@ export class ToolManager {
       case 'line':
         canvas.selection = false;
         canvas.defaultCursor = 'crosshair';
+        // Disable all object interaction so clicks go to line drawing, not shape dragging
+        canvas.forEachObject(o => {
+          if (o.data && (o.data._port || o.data._handle)) return;
+          o.selectable = false;
+          o.evented = false;
+        });
         document.body.classList.add('tool-crosshair');
         break;
 
@@ -180,9 +193,14 @@ export class ToolManager {
 
   _onMouseMove(opt) {
     const tool = this.current;
-    if (!this._drawStart && !this._lineStart) return;
-
     const pointer = canvas_getPointer(this.canvas, opt.e);
+
+    // Line tool: show port hints on hover even when not drawing
+    if (tool === 'line') {
+      this._handleLineHover(pointer.x, pointer.y);
+    }
+
+    if (!this._drawStart && !this._lineStart) return;
 
     if (this._lineStart && tool === 'line') {
       this._updateTempLine(pointer.x, pointer.y);
@@ -372,44 +390,142 @@ export class ToolManager {
 
   // Text editing for shape groups is handled by ShapeManager.editShapeText()
 
-  // ─── Line / Arrow ──────────────────────────────────────────────────────────
+  // ─── Line / Arrow (connection-aware) ───────────────────────────────────────
+
+  _handleLineHover(x, y) {
+    if (this._lineStart) return;
+    const conn = this.app.connectors;
+
+    // Show ports when cursor is near any connectable object
+    const snap = conn.findSnapPort(x, y, null);
+    if (snap) {
+      conn.showPortsOn(snap.obj);
+      return;
+    }
+
+    // Also show ports if cursor is inside a connectable object's bounding box
+    const hoveredObj = this._findConnectableAt(x, y);
+    if (hoveredObj) {
+      conn.showPortsOn(hoveredObj);
+    } else {
+      conn._clearPortDots();
+    }
+  }
+
+  _findConnectableAt(x, y) {
+    const conn = this.app.connectors;
+    const objects = this.canvas.getObjects();
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i];
+      if (!conn._isConnectable(obj)) continue;
+      const b = obj.getBoundingRect(true, true);
+      if (x >= b.left && x <= b.left + b.width && y >= b.top && y <= b.top + b.height) {
+        return obj;
+      }
+    }
+    return null;
+  }
 
   _startLine(x, y) {
-    this._lineStart = { x, y };
+    const conn = this.app.connectors;
+    const snap = conn.findSnapPort(x, y, null);
 
-    // Create temp preview line
-    this._lineTempObj = new fabric.Line([x, y, x, y], {
-      stroke: this.app.canvasManager.isDark ? '#e0e0e0' : '#333',
-      strokeWidth: 2,
-      selectable: false,
-      evented: false,
-      data: { temp: true },
-    });
+    console.log('[LINE] startLine at', x, y, 'snap:', snap ? snap.port + ' on ' + (snap.obj.data && snap.obj.data.type) : 'none');
+
+    if (snap) {
+      this._lineSourceSnap = { obj: snap.obj, port: snap.port };
+      this._lineStart = { x: snap.pos.x, y: snap.pos.y };
+      conn.highlightPort(snap.obj, snap.port);
+    } else {
+      this._lineSourceSnap = null;
+      this._lineStart = { x, y };
+    }
+
+    this._lineTempObj = new fabric.Line(
+      [this._lineStart.x, this._lineStart.y, this._lineStart.x, this._lineStart.y],
+      {
+        stroke: this.app.canvasManager.isDark ? '#b0b8c8' : '#555',
+        strokeWidth: 2,
+        strokeDashArray: [6, 4],
+        selectable: false, evented: false,
+        data: { temp: true },
+      }
+    );
     this.canvas.add(this._lineTempObj);
   }
 
   _updateTempLine(x, y) {
     if (!this._lineTempObj) return;
-    this._lineTempObj.set({ x2: x, y2: y });
+    const conn = this.app.connectors;
+    const sourceObj = this._lineSourceSnap ? this._lineSourceSnap.obj : null;
+    const snap = conn.findSnapPort(x, y, sourceObj);
+
+    if (snap) {
+      this._lineTempObj.set({ x2: snap.pos.x, y2: snap.pos.y });
+      conn.highlightPort(snap.obj, snap.port);
+      this._lineTargetSnap = snap;
+    } else {
+      this._lineTempObj.set({ x2: x, y2: y });
+      conn._clearPortDots();
+      if (this._lineSourceSnap) {
+        conn.highlightPort(this._lineSourceSnap.obj, this._lineSourceSnap.port);
+      }
+      this._lineTargetSnap = null;
+    }
     this.canvas.renderAll();
   }
 
   _finishLine(x, y) {
     if (!this._lineStart) return;
+    const conn = this.app.connectors;
 
     if (this._lineTempObj) {
       this.canvas.remove(this._lineTempObj);
       this._lineTempObj = null;
     }
+    conn._clearPortDots();
 
-    const line = this.app.connectors.createLine(
-      this._lineStart.x, this._lineStart.y, x, y
-    );
+    const sourceObj = this._lineSourceSnap ? this._lineSourceSnap.obj : null;
+    const finalSnap = conn.findSnapPort(x, y, sourceObj) || this._lineTargetSnap;
+
+    const hasSource = !!this._lineSourceSnap;
+    const hasTarget = !!finalSnap;
+
+    console.log('[LINE] finishLine', { hasSource, hasTarget, finalSnap });
+
+    if (hasSource && hasTarget && this._lineSourceSnap.obj !== finalSnap.obj) {
+      // Connected line
+      conn.connect(
+        { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
+        { obj: finalSnap.obj, port: finalSnap.port },
+        { arrow: true }
+      );
+    } else if (hasSource && !hasTarget) {
+      // Source attached, target free
+      conn.connect(
+        { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
+        { x, y },
+        { arrow: true }
+      );
+    } else if (!hasSource && hasTarget) {
+      // Source free, target attached
+      conn.connect(
+        { x: this._lineStart.x, y: this._lineStart.y },
+        { obj: finalSnap.obj, port: finalSnap.port },
+        { arrow: true }
+      );
+    } else {
+      // Both free — standalone line
+      const line = conn.createLine(
+        this._lineStart.x, this._lineStart.y, x, y, { arrow: true }
+      );
+      this.canvas.add(line);
+      this.canvas.setActiveObject(line);
+    }
 
     this._lineStart = null;
-
-    this.canvas.add(line);
-    this.canvas.setActiveObject(line);
+    this._lineSourceSnap = null;
+    this._lineTargetSnap = null;
     this.canvas.renderAll();
     this.app.history.saveState();
     this.setTool('select');
