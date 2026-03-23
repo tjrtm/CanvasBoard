@@ -324,7 +324,6 @@ export class ConnectorManager {
    * Either end can be { obj, port } (attached) or { x, y } (free point).
    */
   connect(source, target, options = {}) {
-    console.log('[CONN] connect', source, target, options);
     const connId = uid();
     const isDark = this.app.canvasManager.isDark;
     const mode = options.mode || 'straight';
