@@ -98,9 +98,20 @@ export class ConnectorManager {
       return obj.getCenterPoint();
     }
     const center = obj.getCenterPoint();
-    const b = obj.getBoundingRect(false, true);
     const def = PORT_DEFS[portName];
-    return { x: center.x + def.nx * b.width, y: center.y + def.ny * b.height };
+
+    // For groups, use the group's own width/height * scaleX/Y for accurate borders
+    let w, h;
+    if (obj.width !== undefined && obj.height !== undefined) {
+      w = obj.width * (obj.scaleX || 1);
+      h = obj.height * (obj.scaleY || 1);
+    } else {
+      const b = obj.getBoundingRect(false, true);
+      w = b.width;
+      h = b.height;
+    }
+
+    return { x: center.x + def.nx * w, y: center.y + def.ny * h };
   }
 
   /**
@@ -183,7 +194,14 @@ export class ConnectorManager {
   /**
    * Generate SVG path data between two points with the given routing mode.
    */
+  /**
+   * @param arrow - 'none' | 'end' | 'start' | 'both' (legacy true='end', false='none')
+   */
   _pathData(x1, y1, x2, y2, mode, arrow, sourcePort, targetPort) {
+    // Normalize legacy boolean
+    if (arrow === true) arrow = 'end';
+    if (arrow === false) arrow = 'none';
+
     let d;
     switch (mode) {
       case 'curved':
@@ -192,10 +210,15 @@ export class ConnectorManager {
       case 'elbow':
         d = this._elbowPath(x1, y1, x2, y2, sourcePort, targetPort);
         break;
-      default: // straight
+      default:
         d = `M ${x1} ${y1} L ${x2} ${y2}`;
     }
-    if (arrow) d += this._arrowHead(x1, y1, x2, y2, mode);
+    if (arrow === 'end' || arrow === 'both') {
+      d += this._arrowHead(x1, y1, x2, y2, mode);
+    }
+    if (arrow === 'start' || arrow === 'both') {
+      d += this._arrowHead(x2, y2, x1, y1, mode);
+    }
     return d;
   }
 
@@ -301,11 +324,10 @@ export class ConnectorManager {
    * Either end can be { obj, port } (attached) or { x, y } (free point).
    */
   connect(source, target, options = {}) {
-    console.log('[CONN] connect', source, target, options);
     const connId = uid();
     const isDark = this.app.canvasManager.isDark;
     const mode = options.mode || 'straight';
-    const arrow = options.arrow !== undefined ? options.arrow : true;
+    const arrow = options.arrow !== undefined ? options.arrow : 'end';
     const style = options.style || 'solid';
     const color = options.color || (isDark ? '#b0b8c8' : '#555555');
     const width = options.strokeWidth || 2;
@@ -581,13 +603,15 @@ export class ConnectorManager {
     this.canvas.renderAll();
   }
 
-  toggleArrow(obj) {
+  setArrowMode(obj, mode) {
     if (!obj || !obj.data) return;
     if (obj.data.connId) {
       const rec = this.connections.get(obj.data.connId);
       if (!rec) return;
-      rec.arrow = !rec.arrow;
+      rec.arrow = mode;
       this._rebuildLine(rec);
+    } else if (obj.data.type === 'line') {
+      obj.data.arrow = mode;
     }
     this.canvas.renderAll();
     this.app.history.saveState();
@@ -599,7 +623,7 @@ export class ConnectorManager {
     const isDark = this.app.canvasManager.isDark;
     const color = options.color || (isDark ? '#e0e0e0' : '#333333');
     const width = options.strokeWidth || 2;
-    const hasArrow = options.arrow !== undefined ? options.arrow : false;
+    const arrow = options.arrow !== undefined ? options.arrow : 'none';
     const style = options.style || 'solid';
 
     let strokeDash = null;
@@ -607,7 +631,12 @@ export class ConnectorManager {
     if (style === 'dotted') strokeDash = [3, 5];
 
     let pathStr = `M ${x1} ${y1} L ${x2} ${y2}`;
-    if (hasArrow) pathStr += this._arrowHead(x1, y1, x2, y2, 'straight');
+    if (arrow === 'end' || arrow === 'both' || arrow === true) {
+      pathStr += this._arrowHead(x1, y1, x2, y2, 'straight');
+    }
+    if (arrow === 'start' || arrow === 'both') {
+      pathStr += this._arrowHead(x2, y2, x1, y1, 'straight');
+    }
 
     return new fabric.Path(pathStr, {
       stroke: color,
@@ -621,7 +650,7 @@ export class ConnectorManager {
       hasBorders: true,
       hasControls: false,
       perPixelTargetFind: true,
-      data: { type: 'line', style, arrow: hasArrow },
+      data: { type: 'line', style, arrow },
     });
   }
 

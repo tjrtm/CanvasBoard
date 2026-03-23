@@ -430,7 +430,6 @@ export class ToolManager {
     const conn = this.app.connectors;
     const snap = conn.findSnapPort(x, y, null);
 
-    console.log('[LINE] startLine at', x, y, 'snap:', snap ? snap.port + ' on ' + (snap.obj.data && snap.obj.data.type) : 'none');
 
     if (snap) {
       this._lineSourceSnap = { obj: snap.obj, port: snap.port };
@@ -491,33 +490,32 @@ export class ToolManager {
     const hasSource = !!this._lineSourceSnap;
     const hasTarget = !!finalSnap;
 
-    console.log('[LINE] finishLine', { hasSource, hasTarget, finalSnap });
 
     if (hasSource && hasTarget && this._lineSourceSnap.obj !== finalSnap.obj) {
       // Connected line
       conn.connect(
         { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
         { obj: finalSnap.obj, port: finalSnap.port },
-        { arrow: true }
+        { arrow: 'end' }
       );
     } else if (hasSource && !hasTarget) {
       // Source attached, target free
       conn.connect(
         { obj: this._lineSourceSnap.obj, port: this._lineSourceSnap.port },
         { x, y },
-        { arrow: true }
+        { arrow: 'end' }
       );
     } else if (!hasSource && hasTarget) {
       // Source free, target attached
       conn.connect(
         { x: this._lineStart.x, y: this._lineStart.y },
         { obj: finalSnap.obj, port: finalSnap.port },
-        { arrow: true }
+        { arrow: 'end' }
       );
     } else {
       // Both free — standalone line
       const line = conn.createLine(
-        this._lineStart.x, this._lineStart.y, x, y, { arrow: true }
+        this._lineStart.x, this._lineStart.y, x, y, { arrow: 'end' }
       );
       this.canvas.add(line);
       this.canvas.setActiveObject(line);

@@ -187,9 +187,12 @@ export class PropertiesPanel {
       const obj = this.canvas.getActiveObject();
       if (obj) this.app.connectors.setLineStyle(obj, val);
     });
-    on('prop-arrow-end', 'change', () => {
+    on('prop-arrow-mode', 'change', () => {
       const obj = this.canvas.getActiveObject();
-      if (obj) this.app.connectors.toggleArrow(obj);
+      if (obj) {
+        const mode = document.getElementById('prop-arrow-mode').value;
+        this.app.connectors.setArrowMode(obj, mode);
+      }
     });
     on('prop-route-mode', 'change', () => {
       const obj = this.canvas.getActiveObject();
@@ -423,8 +426,20 @@ export class PropertiesPanel {
       lineProps.classList.remove('hidden');
       const lsEl = document.getElementById('prop-line-style');
       if (lsEl) lsEl.value = (obj.data && obj.data.style) || 'solid';
-      const arrowEl = document.getElementById('prop-arrow-end');
-      if (arrowEl) arrowEl.checked = !!(obj.data && obj.data.arrow);
+      const arrowEl = document.getElementById('prop-arrow-mode');
+      if (arrowEl && obj.data) {
+        let mode = 'none';
+        if (obj.data.connId) {
+          const rec = this.app.connectors.connections.get(obj.data.connId);
+          if (rec) mode = rec.arrow || 'none';
+        } else {
+          mode = obj.data.arrow || 'none';
+        }
+        // Normalize legacy boolean
+        if (mode === true) mode = 'end';
+        if (mode === false) mode = 'none';
+        arrowEl.value = mode;
+      }
 
       // Show routing mode only for connections
       const routeRow = document.getElementById('routing-mode-row');
