@@ -50,6 +50,7 @@ async function init() {
   App.shortcuts.init();
   App.minimap.init();
   App.frames.init();
+  App.connectors.init();
 
   // ── 6. Persistence: init then load saved state ────────────────────────────
   App.persistence.init();

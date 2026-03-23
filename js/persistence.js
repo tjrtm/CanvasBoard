@@ -121,8 +121,9 @@ export class PersistenceManager {
   _serialize() {
     const canvasJson = this.canvas.toJSON(['data', 'locked', 'subTargetCheck']);
     const payload = {
-      version: 1,
+      version: 2,
       canvas: canvasJson,
+      connections: this.app.connectors.serializeConnections(),
       viewport: this.canvas.viewportTransform.slice(),
       theme: this.app.canvasManager.isDark ? 'dark' : 'light',
     };
@@ -135,9 +136,23 @@ export class PersistenceManager {
         const payload = JSON.parse(text);
         const canvasData = payload.canvas || payload; // support legacy format
 
+        // Clear existing connections before loading
+        this.app.connectors.connections.clear();
+
         this.canvas.loadFromJSON(canvasData, () => {
           if (payload.viewport) {
             this.canvas.setViewportTransform(payload.viewport);
+          }
+
+          // Restore connections after canvas objects are loaded
+          if (payload.connections) {
+            // Remove connection line objects from canvas (they'll be rebuilt)
+            const connLines = this.canvas.getObjects().filter(
+              o => o.data && o.data.type === 'connection'
+            );
+            connLines.forEach(l => this.canvas.remove(l));
+
+            this.app.connectors.restoreConnections(payload.connections);
           }
 
           this.canvas.renderAll();

@@ -373,7 +373,7 @@ export class PropertiesPanel {
         ['rect', 'circle', 'diamond', 'triangle', 'sticky'].includes(obj.data.type);
     const isSticky = obj.type === 'group' && obj.data && obj.data.type === 'sticky';
     const isLine = (obj.type === 'line' || obj.type === 'path') &&
-                   obj.data && obj.data.type === 'line';
+                   obj.data && (obj.data.type === 'line' || obj.data.type === 'connection');
 
     // Standalone text objects
     if (isText && textProps) {

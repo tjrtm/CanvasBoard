@@ -581,6 +581,11 @@ body.tool-grabbing .upper-canvas { cursor: grabbing !important; }
 /* Resize handle visibility */
 .canvas-container.panning .upper-canvas { cursor: grabbing !important; }
 
+/* Connection port indicators */
+.canvas-container canvas {
+  /* Ports rendered by fabric on the canvas itself */
+}
+
 /* Shape text editing overlay */
 .shape-text-overlay {
   pointer-events: auto;
