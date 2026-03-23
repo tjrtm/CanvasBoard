@@ -224,6 +224,7 @@ export class PropertiesPanel {
     on('btn-ungroup', () => this.app.selection.ungroup());
     on('btn-delete', () => this.app.selection.deleteSelected());
     on('btn-duplicate', () => this.app.selection.duplicate());
+    on('btn-lock', () => this.app.selection.toggleLock());
   }
 
   // ─── Style helpers ──────────────────────────────────────────────────────────
